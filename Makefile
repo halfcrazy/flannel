@@ -75,9 +75,6 @@ test: header-check gofmt
 	# SYS_ADMIN capacity is required to create network namespace
 	docker run --cap-add=NET_ADMIN --cap-add=SYS_ADMIN --rm -v $(shell pwd):/go/src/github.com/coreos/flannel golang:1.8.3 go test -v -cover $(TEST_PACKAGES_EXPANDED)
 
-	# Test the docker-opts script
-	cd dist; ./mk-docker-opts_tests.sh
-
 	# Run the functional tests
 	make e2e-test
 
@@ -146,22 +143,22 @@ dist/qemu-%-static:
 ## Build a .tar.gz for the amd64 ppc64le arm arm64 flanneld binary
 tar.gz:
 	ARCH=amd64 make dist/flanneld-amd64
-	tar --transform='flags=r;s|-amd64||' -zcvf dist/flannel-$(TAG)-linux-amd64.tar.gz -C dist flanneld-amd64 mk-docker-opts.sh ../README.md
+	tar --transform='flags=r;s|-amd64||' -zcvf dist/flannel-$(TAG)-linux-amd64.tar.gz -C dist flanneld-amd64 ../README.md
 	tar -tvf dist/flannel-$(TAG)-linux-amd64.tar.gz
 	ARCH=amd64 make dist/flanneld.exe
-	tar --transform='flags=r;s|-amd64||' -zcvf dist/flannel-$(TAG)-windows-amd64.tar.gz -C dist flanneld.exe mk-docker-opts.sh ../README.md
+	tar --transform='flags=r;s|-amd64||' -zcvf dist/flannel-$(TAG)-windows-amd64.tar.gz -C dist flanneld.exe ../README.md
 	tar -tvf dist/flannel-$(TAG)-windows-amd64.tar.gz
 	ARCH=ppc64le make dist/flanneld-ppc64le
-	tar --transform='flags=r;s|-ppc64le||' -zcvf dist/flannel-$(TAG)-linux-ppc64le.tar.gz -C dist flanneld-ppc64le mk-docker-opts.sh ../README.md
+	tar --transform='flags=r;s|-ppc64le||' -zcvf dist/flannel-$(TAG)-linux-ppc64le.tar.gz -C dist flanneld-ppc64le ../README.md
 	tar -tvf dist/flannel-$(TAG)-linux-ppc64le.tar.gz
 	ARCH=arm make dist/flanneld-arm
-	tar --transform='flags=r;s|-arm||' -zcvf dist/flannel-$(TAG)-linux-arm.tar.gz -C dist flanneld-arm mk-docker-opts.sh ../README.md
+	tar --transform='flags=r;s|-arm||' -zcvf dist/flannel-$(TAG)-linux-arm.tar.gz -C dist flanneld-arm ../README.md
 	tar -tvf dist/flannel-$(TAG)-linux-arm.tar.gz
 	ARCH=arm64 make dist/flanneld-arm64
-	tar --transform='flags=r;s|-arm64||' -zcvf dist/flannel-$(TAG)-linux-arm64.tar.gz -C dist flanneld-arm64 mk-docker-opts.sh ../README.md
+	tar --transform='flags=r;s|-arm64||' -zcvf dist/flannel-$(TAG)-linux-arm64.tar.gz -C dist flanneld-arm64 ../README.md
 	tar -tvf dist/flannel-$(TAG)-linux-arm64.tar.gz
 	ARCH=s390x make dist/flanneld-s390x
-	tar --transform='flags=r;s|-s390x||' -zcvf dist/flannel-$(TAG)-linux-s390x.tar.gz -C dist flanneld-s390x mk-docker-opts.sh ../README.md
+	tar --transform='flags=r;s|-s390x||' -zcvf dist/flannel-$(TAG)-linux-s390x.tar.gz -C dist flanneld-s390x ../README.md
 	tar -tvf dist/flannel-$(TAG)-linux-s390x.tar.gz
 
 release-tests: bash_unit
