@@ -4,6 +4,7 @@ LABEL maintainer="Tom Denham <tom@tigera.io>"
 
 ENV FLANNEL_ARCH=amd64
 
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 RUN apk add --no-cache iproute2 net-tools ca-certificates iptables strongswan && update-ca-certificates
 RUN apk add wireguard-tools --no-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/community
 COPY dist/flanneld-$FLANNEL_ARCH /opt/bin/flanneld

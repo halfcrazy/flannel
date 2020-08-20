@@ -2,7 +2,7 @@
 
 # Registry used for publishing images
 REGISTRY?=quay.io/coreos/flannel
-QEMU_VERSION=v3.0.0
+QEMU_VERSION=v5.0.0-2
 
 # Default tag and architecture. Can be overridden
 TAG?=$(shell git describe --tags --dirty)
@@ -14,13 +14,14 @@ else
 	CGO_ENABLED=0
 endif
 
+# IP family for kind. ipv4/ipv6, dual-stack not yet support
+IP_FAMILY?=ipv4
+
 # Go version to use for builds
 GO_VERSION=1.14.6
 
 # K8s version used for Makefile helpers
-K8S_VERSION=v1.6.6
-
-GOARM=7
+K8S_VERSION=v1.18.6
 
 # These variables can be overridden by setting an environment variable.
 TEST_PACKAGES?=pkg/ip subnet subnet/etcdv2 network backend
@@ -67,6 +68,10 @@ dist/flanneld-$(TAG)-$(ARCH).docker: dist/flanneld-$(ARCH)
 ifeq ($(ARCH),amd64)
 	docker build -f Dockerfile.$(ARCH) -t $(REGISTRY):$(TAG) .
 endif
+
+# Get flannel binary from https://github.com/containernetworking/plugins for kind env
+dist/flannel:
+	curl -L --retry 5 https://github.com/containernetworking/plugins/releases/download/v0.8.6/cni-plugins-linux-amd64-v0.8.6.tgz | tar -xz -C dist/ ./flannel ./bridge
 
 ### TESTING
 test: header-check gofmt verify-modules
@@ -120,7 +125,7 @@ gofmt-fix:
 		gofmt -w $(PACKAGES)'
 
 bash_unit:
-	wget https://raw.githubusercontent.com/pgrange/bash_unit/v1.6.0/bash_unit
+	wget https://raw.githubusercontent.com/pgrange/bash_unit/v1.7.1/bash_unit
 	chmod +x bash_unit
 
 # This will build flannel natively using golang image
@@ -129,7 +134,7 @@ ifneq ($(ARCH),amd64)
 	$(MAKE) dist/qemu-$(ARCH)-static
 endif
 	# valid values for ARCH are [amd64 arm arm64 ppc64le s390x]
-	docker run -e GOARM=$(GOARM) -e GOCACHE=/go \
+	docker run -e GOARCH=$(ARCH) -e GOCACHE=/go \
 		-u $(shell id -u):$(shell id -g) \
 		-v $(CURDIR):/go/src/github.com/coreos/flannel:ro \
 		-v $(CURDIR)/dist:/go/src/github.com/coreos/flannel/dist \
@@ -229,13 +234,13 @@ flannel-git:
 install:
 	# This is intended as just a developer convenience to help speed up non-containerized builds
 	# It is NOT how you install flannel
-	CGO_ENABLED=1 go install -v github.com/coreos/flannel
+	CGO_ENABLED=0 go install -v github.com/coreos/flannel
 
 minikube-start:
 	minikube start --network-plugin cni
 
 minikube-build-image:
-	CGO_ENABLED=1 go build -v -o dist/flanneld-amd64
+	CGO_ENABLED=0 go build -v -o dist/flanneld-amd64
 	# Make sure the minikube docker is being used "eval $(minikube docker-env)"
 	sh -c 'eval $$(minikube docker-env) && docker build -f Dockerfile.amd64 -t flannel/minikube .'
 
@@ -281,3 +286,31 @@ run-local-kube-flannel-with-prereqs: run-etcd run-k8s-apiserver dist/flanneld
 run-local-kube-flannel:
 	# Currently this requires the netconf to be in /etc/kube-flannel/net-conf.json
 	sudo NODE_NAME=test dist/flanneld --kube-subnet-mgr --kube-api-url http://127.0.0.1:8080
+
+kind-start: dist/flannel
+	kind create cluster --config dist/kind-$(IP_FAMILY).yaml --name flannel
+	kubectl cluster-info --context kind-flannel
+	docker cp ./dist/flannel flannel-worker:/opt/cni/bin/
+	docker cp ./dist/bridge flannel-worker:/opt/cni/bin/
+	docker cp ./dist/flannel flannel-control-plane:/opt/cni/bin/
+	docker cp ./dist/bridge flannel-control-plane:/opt/cni/bin/
+
+kind-destroy:
+	kind delete cluster --name flannel
+
+kind-deploy-flannel: image
+	kind load docker-image --name flannel $(REGISTRY):$(TAG)
+	kubectl apply -f Documentation/kind.yml
+	kubectl set image daemonset.v1.apps/kube-flannel-ds *=$(REGISTRY):$(TAG)
+
+kind-remove-flannel:
+	kubectl delete -f Documentation/kind.yml
+
+kind-restart-pod:
+	kind load docker-image --name flannel $(REGISTRY):$(TAG)
+	# Use this to pick up a new image
+	kubectl delete pods -l app=flannel --grace-period=0
+
+kind-load-workload:
+	kind load docker-image --name flannel nginx:alpine
+	kubectl apply -f dist/kind-test-ds.yaml
