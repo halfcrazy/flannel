@@ -88,5 +88,5 @@ func IPNetExpand(ipn net.IPNet) string {
 
 func NetEmpty(ipn net.IPNet) bool {
 	ones, _ := ipn.Mask.Size()
-	return (ipn.IP.Equal(net.IPv6zero) || ipn.IP.Equal(net.IPv4zero)) && ones == 0
+	return (ipn.IP == nil) && ones == 0
 }

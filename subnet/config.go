@@ -25,7 +25,8 @@ import (
 )
 
 type Config struct {
-	Network     net.IPNet
+	Network     net.IPNet `json:"-"`
+	CIDR        string    `json:"Network"`
 	SubnetMin   net.IP
 	SubnetMax   net.IP
 	SubnetLen   uint
@@ -54,6 +55,12 @@ func ParseConfig(s string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	_, ipn, err := net.ParseCIDR(cfg.CIDR)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Network = *ipn
 
 	protocol := ip.ProtocolByIPNet(cfg.Network)
 	if protocol == ip.ProtocolIPv4 {
@@ -88,7 +95,7 @@ func ParseConfig(s string) (*Config, error) {
 
 		subnetSize := new(big.Int).Lsh(big.NewInt(1), 32-cfg.SubnetLen)
 
-		if cfg.SubnetMin.Equal(net.IPv4zero) {
+		if cfg.SubnetMin == nil {
 			// skip over the first subnet otherwise it causes problems. e.g.
 			// if Network is 10.100.0.0/16, having an interface with 10.0.0.0
 			// conflicts with the broadcast address.
@@ -97,7 +104,7 @@ func ParseConfig(s string) (*Config, error) {
 			return nil, errors.New("SubnetMin is not in the range of the Network")
 		}
 
-		if cfg.SubnetMax.Equal(net.IPv4zero) {
+		if cfg.SubnetMax == nil {
 			cfg.SubnetMax = ip.PreviousNIP(cfg.Network.IP, subnetSize)
 		} else if !cfg.Network.Contains(cfg.SubnetMax) {
 			return nil, errors.New("SubnetMax is not in the range of the Network")
@@ -143,7 +150,7 @@ func ParseConfig(s string) (*Config, error) {
 
 		subnetSize := new(big.Int).Lsh(big.NewInt(1), 128-cfg.SubnetLen)
 
-		if cfg.SubnetMin.Equal(net.IPv6zero) {
+		if cfg.SubnetMin == nil {
 			// skip over the first subnet otherwise it causes problems. e.g.
 			// if Network is 10.100.0.0/16, having an interface with 10.0.0.0
 			// conflicts with the broadcast address.
@@ -152,7 +159,7 @@ func ParseConfig(s string) (*Config, error) {
 			return nil, errors.New("SubnetMin is not in the range of the Network")
 		}
 
-		if cfg.SubnetMax.Equal(net.IPv6zero) {
+		if cfg.SubnetMax == nil {
 			cfg.SubnetMax = ip.PreviousNIP(cfg.Network.IP, subnetSize)
 		} else if !cfg.Network.Contains(cfg.SubnetMax) {
 			return nil, errors.New("SubnetMax is not in the range of the Network")

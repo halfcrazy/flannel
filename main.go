@@ -99,6 +99,7 @@ type CmdLineOpts struct {
 	iptablesResyncSeconds  int
 	iptablesForwardRules   bool
 	netConfPath            string
+	ipFamily               string
 }
 
 var (
@@ -132,6 +133,7 @@ func init() {
 	flannelFlags.IntVar(&opts.iptablesResyncSeconds, "iptables-resync", 5, "resync period for iptables rules, in seconds")
 	flannelFlags.BoolVar(&opts.iptablesForwardRules, "iptables-forward-rules", true, "add default accept rules to FORWARD chain in iptables")
 	flannelFlags.StringVar(&opts.netConfPath, "net-config-path", "/etc/kube-flannel/net-conf.json", "path to the network configuration file")
+	flannelFlags.StringVar(&opts.ipFamily, "ip-family", ip.FamilyIPV4, "preferred ip family(ipv4 or ipv6)")
 
 	// glog will log to tmp files by default. override so all entries
 	// can flow into journald (if running under systemd)
@@ -185,7 +187,7 @@ func main() {
 	var err error
 	// Check the default interface only if no interfaces are specified
 	if len(opts.iface) == 0 && len(opts.ifaceRegex) == 0 {
-		extIface, err = LookupExtIface(opts.publicIP, "")
+		extIface, err = LookupExtIface(opts.publicIP, "", opts.ipFamily)
 		if err != nil {
 			log.Error("Failed to find any valid interface to use: ", err)
 			os.Exit(1)
@@ -193,7 +195,7 @@ func main() {
 	} else {
 		// Check explicitly specified interfaces
 		for _, iface := range opts.iface {
-			extIface, err = LookupExtIface(iface, "")
+			extIface, err = LookupExtIface(iface, "", opts.ipFamily)
 			if err != nil {
 				log.Infof("Could not find valid interface matching %s: %s", iface, err)
 			}
@@ -206,7 +208,7 @@ func main() {
 		// Check interfaces that match any specified regexes
 		if extIface == nil {
 			for _, ifaceRegex := range opts.ifaceRegex {
-				extIface, err = LookupExtIface("", ifaceRegex)
+				extIface, err = LookupExtIface("", ifaceRegex, opts.ipFamily)
 				if err != nil {
 					log.Infof("Could not find valid interface matching %s: %s", ifaceRegex, err)
 				}
@@ -432,7 +434,7 @@ func MonitorLease(ctx context.Context, sm subnet.Manager, bn backend.Network, wg
 	}
 }
 
-func LookupExtIface(ifname string, ifregex string) (*backend.ExternalInterface, error) {
+func LookupExtIface(ifname string, ifregex string, ifamily string) (*backend.ExternalInterface, error) {
 	var iface *net.Interface
 	var ifaceAddr net.IP
 	var err error
@@ -460,7 +462,7 @@ func LookupExtIface(ifname string, ifregex string) (*backend.ExternalInterface, 
 
 		// Check IP
 		for _, ifaceToMatch := range ifaces {
-			ifaceIP, err := ip.GetInterfaceIP4Addr(&ifaceToMatch)
+			ifaceIP, err := ip.GetInterfaceIPAddr(&ifaceToMatch, opts.ipFamily)
 			if err != nil {
 				// Skip if there is no IPv4 address
 				continue
@@ -497,7 +499,7 @@ func LookupExtIface(ifname string, ifregex string) (*backend.ExternalInterface, 
 		if iface == nil {
 			var availableFaces []string
 			for _, f := range ifaces {
-				ip, _ := ip.GetInterfaceIP4Addr(&f) // We can safely ignore errors. We just won't log any ip
+				ip, _ := ip.GetInterfaceIPAddr(&f, ifamily) // We can safely ignore errors. We just won't log any ip
 				availableFaces = append(availableFaces, fmt.Sprintf("%s:%s", f.Name, ip))
 			}
 
@@ -511,9 +513,9 @@ func LookupExtIface(ifname string, ifregex string) (*backend.ExternalInterface, 
 	}
 
 	if ifaceAddr == nil {
-		ifaceAddr, err = ip.GetInterfaceIP4Addr(iface)
+		ifaceAddr, err = ip.GetInterfaceIPAddr(iface, ifamily)
 		if err != nil {
-			return nil, fmt.Errorf("failed to find IPv4 address for interface %s", iface.Name)
+			return nil, fmt.Errorf("failed to find %s address for interface %s", ifamily, iface.Name)
 		}
 	}
 

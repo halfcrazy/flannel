@@ -300,7 +300,7 @@ kind-destroy:
 
 kind-deploy-flannel: image
 	kind load docker-image --name flannel $(REGISTRY):$(TAG)
-	kubectl apply -f Documentation/kind.yml
+	kubectl apply -f Documentation/kind-$(IP_FAMILY).yml
 	kubectl set image daemonset.v1.apps/kube-flannel-ds *=$(REGISTRY):$(TAG)
 
 kind-remove-flannel:

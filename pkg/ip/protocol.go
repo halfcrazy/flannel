@@ -24,6 +24,11 @@ const (
 	ProtocolIPv6
 )
 
+const (
+	FamilyIPV4 = "ipv4"
+	FamilyIPV6 = "ipv6"
+)
+
 func ProtocolByIPNet(ipn net.IPNet) Protocol {
 	if ipn.IP.To4() != nil {
 		return ProtocolIPv4

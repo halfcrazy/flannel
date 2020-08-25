@@ -35,6 +35,16 @@ func getIfaceAddrs(iface *net.Interface) ([]netlink.Addr, error) {
 	return netlink.AddrList(link, syscall.AF_INET)
 }
 
+func getIface6Addrs(iface *net.Interface) ([]netlink.Addr, error) {
+	link := &netlink.Device{
+		netlink.LinkAttrs{
+			Index: iface.Index,
+		},
+	}
+
+	return netlink.AddrList(link, syscall.AF_INET6)
+}
+
 func GetInterfaceIP4Addr(iface *net.Interface) (net.IP, error) {
 	addrs, err := getIfaceAddrs(iface)
 	if err != nil {
@@ -67,7 +77,7 @@ func GetInterfaceIP4Addr(iface *net.Interface) (net.IP, error) {
 }
 
 func GetInterfaceIP6AddrMatch(iface *net.Interface, matchAddr net.IP) error {
-	addrs, err := getIfaceAddrs(iface)
+	addrs, err := getIface6Addrs(iface)
 	if err != nil {
 		return err
 	}
@@ -229,4 +239,44 @@ func EnsureAddressOnLink(ipn net.IPNet, link netlink.Link) error {
 	}
 
 	return nil
+}
+
+func GetInterfaceIP6Addr(iface *net.Interface) (net.IP, error) {
+	addrs, err := getIface6Addrs(iface)
+	if err != nil {
+		return nil, err
+	}
+
+	// prefer non link-local addr
+	var ll net.IP
+
+	for _, addr := range addrs {
+		if addr.IP.To4() != nil {
+			continue
+		}
+
+		if addr.IP.IsGlobalUnicast() {
+			return addr.IP, nil
+		}
+
+		if addr.IP.IsLinkLocalUnicast() {
+			ll = addr.IP
+		}
+	}
+
+	if ll != nil {
+		// didn't find global but found link-local. it'll do.
+		return ll, nil
+	}
+
+	return nil, errors.New("No IPv6 address found for given interface")
+}
+
+func GetInterfaceIPAddr(iface *net.Interface, ifamily string) (net.IP, error) {
+	if ifamily == FamilyIPV4 {
+		return GetInterfaceIP4Addr(iface)
+	} else if ifamily == FamilyIPV6 {
+		return GetInterfaceIP6Addr(iface)
+	}
+	return nil, errors.New("Unsupport ip family")
 }
