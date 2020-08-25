@@ -15,6 +15,7 @@
 package subnet
 
 import (
+	"net"
 	"time"
 
 	log "github.com/golang/glog"
@@ -70,13 +71,13 @@ func (lw *leaseWatcher) reset(leases []Lease) []Event {
 	batch := []Event{}
 
 	for _, nl := range leases {
-		if lw.ownLease != nil && nl.Subnet.Equal(lw.ownLease.Subnet) {
+		if lw.ownLease != nil && ip.NetEqual(nl.Subnet, lw.ownLease.Subnet) {
 			continue
 		}
 
 		found := false
 		for i, ol := range lw.leases {
-			if ol.Subnet.Equal(nl.Subnet) {
+			if ip.NetEqual(ol.Subnet, nl.Subnet) {
 				lw.leases = deleteLease(lw.leases, i)
 				found = true
 				break
@@ -91,7 +92,7 @@ func (lw *leaseWatcher) reset(leases []Lease) []Event {
 
 	// everything left in sm.leases has been deleted
 	for _, l := range lw.leases {
-		if lw.ownLease != nil && l.Subnet.Equal(lw.ownLease.Subnet) {
+		if lw.ownLease != nil && ip.NetEqual(l.Subnet, lw.ownLease.Subnet) {
 			continue
 		}
 		batch = append(batch, Event{EventRemoved, l})
@@ -108,7 +109,7 @@ func (lw *leaseWatcher) update(events []Event) []Event {
 	batch := []Event{}
 
 	for _, e := range events {
-		if lw.ownLease != nil && e.Lease.Subnet.Equal(lw.ownLease.Subnet) {
+		if lw.ownLease != nil && ip.NetEqual(e.Lease.Subnet, lw.ownLease.Subnet) {
 			continue
 		}
 
@@ -126,7 +127,7 @@ func (lw *leaseWatcher) update(events []Event) []Event {
 
 func (lw *leaseWatcher) add(lease *Lease) Event {
 	for i, l := range lw.leases {
-		if l.Subnet.Equal(lease.Subnet) {
+		if ip.NetEqual(l.Subnet, lease.Subnet) {
 			lw.leases[i] = *lease
 			return Event{EventAdded, lw.leases[i]}
 		}
@@ -139,7 +140,7 @@ func (lw *leaseWatcher) add(lease *Lease) Event {
 
 func (lw *leaseWatcher) remove(lease *Lease) Event {
 	for i, l := range lw.leases {
-		if l.Subnet.Equal(lease.Subnet) {
+		if ip.NetEqual(l.Subnet, lease.Subnet) {
 			lw.leases = deleteLease(lw.leases, i)
 			return Event{EventRemoved, l}
 		}
@@ -158,7 +159,7 @@ func deleteLease(l []Lease, i int) []Lease {
 // and communicates addition/deletion events on receiver channel. It takes care
 // of handling "fall-behind" logic where the history window has advanced too far
 // and it needs to diff the latest snapshot with its saved state and generate events
-func WatchLease(ctx context.Context, sm Manager, sn ip.IP4Net, receiver chan Event) {
+func WatchLease(ctx context.Context, sm Manager, sn net.IPNet, receiver chan Event) {
 	var cursor interface{}
 
 	for {

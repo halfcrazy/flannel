@@ -21,6 +21,7 @@ import (
 	"net"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/coreos/flannel/pkg/ip"
@@ -30,17 +31,20 @@ import (
 var (
 	ErrLeaseTaken  = errors.New("subnet: lease already taken")
 	ErrNoMoreTries = errors.New("subnet: no more tries")
-	subnetRegex    = regexp.MustCompile(`(\d+\.\d+.\d+.\d+)-(\d+)`)
+	// 10.16.0.0-16
+	v4SubnetRegex = regexp.MustCompile(`(\d+\.\d+\.\d+\.\d+)-(\d+)`)
+	// 0:0:0:0:0:0:0:0-127
+	v6SubnetRegex = regexp.MustCompile(`(\w+\:\w+\:\w+\:\w+\:\w+\:\w+\:\w+\:\w+)-(\d+)`)
 )
 
 type LeaseAttrs struct {
-	PublicIP    ip.IP4
+	PublicIP    net.IP
 	BackendType string          `json:",omitempty"`
 	BackendData json.RawMessage `json:",omitempty"`
 }
 
 type Lease struct {
-	Subnet     ip.IP4Net
+	Subnet     net.IPNet
 	Attrs      LeaseAttrs
 	Expiration time.Time
 
@@ -102,27 +106,48 @@ func (et *EventType) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func ParseSubnetKey(s string) *ip.IP4Net {
-	if parts := subnetRegex.FindStringSubmatch(s); len(parts) == 3 {
-		snIp := net.ParseIP(parts[1]).To4()
+func ParseSubnetKey(s string) *net.IPNet {
+	if parts := v4SubnetRegex.FindStringSubmatch(s); len(parts) == 3 {
+		snIp := net.ParseIP(parts[1])
+		if snIp == nil {
+			return nil
+		}
 		prefixLen, err := strconv.ParseUint(parts[2], 10, 5)
 		if snIp != nil && err == nil {
-			return &ip.IP4Net{IP: ip.FromIP(snIp), PrefixLen: uint(prefixLen)}
+			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", snIp.String(), prefixLen))
+			if err != nil {
+				return cidr
+			}
+			return nil
+		}
+	}
+	if parts := v6SubnetRegex.FindStringSubmatch(s); len(parts) == 3 {
+		snIp := net.ParseIP(parts[1])
+		if snIp == nil {
+			return nil
+		}
+		prefixLen, err := strconv.ParseUint(parts[2], 10, 5)
+		if snIp != nil && err == nil {
+			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", snIp.String(), prefixLen))
+			if err != nil {
+				return cidr
+			}
+			return nil
 		}
 	}
 
 	return nil
 }
 
-func MakeSubnetKey(sn ip.IP4Net) string {
-	return sn.StringSep(".", "-")
+func MakeSubnetKey(sn net.IPNet) string {
+	return strings.ReplaceAll(ip.IPNetExpand(sn), "/", "-")
 }
 
 type Manager interface {
 	GetNetworkConfig(ctx context.Context) (*Config, error)
 	AcquireLease(ctx context.Context, attrs *LeaseAttrs) (*Lease, error)
 	RenewLease(ctx context.Context, lease *Lease) error
-	WatchLease(ctx context.Context, sn ip.IP4Net, cursor interface{}) (LeaseWatchResult, error)
+	WatchLease(ctx context.Context, sn net.IPNet, cursor interface{}) (LeaseWatchResult, error)
 	WatchLeases(ctx context.Context, cursor interface{}) (LeaseWatchResult, error)
 
 	Name() string

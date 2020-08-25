@@ -106,19 +106,19 @@ func (nw *network) handleSubnetEvents(batch []subnet.Event) {
 		vxlanRoute := netlink.Route{
 			LinkIndex: nw.dev.link.Attrs().Index,
 			Scope:     netlink.SCOPE_UNIVERSE,
-			Dst:       sn.ToIPNet(),
-			Gw:        sn.IP.ToIP(),
+			Dst:       &sn,
+			Gw:        sn.IP,
 		}
 		vxlanRoute.SetFlag(syscall.RTNH_F_ONLINK)
 
 		// directRouting is where the remote host is on the same subnet so vxlan isn't required.
 		directRoute := netlink.Route{
-			Dst: sn.ToIPNet(),
-			Gw:  attrs.PublicIP.ToIP(),
+			Dst: &sn,
+			Gw:  attrs.PublicIP,
 		}
 		var directRoutingOK = false
 		if nw.dev.directRouting {
-			if dr, err := ip.DirectRouting(attrs.PublicIP.ToIP()); err != nil {
+			if dr, err := ip.DirectRouting(attrs.PublicIP); err != nil {
 				log.Error(err)
 			} else {
 				directRoutingOK = dr

@@ -17,6 +17,7 @@ package etcdv2
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 
@@ -34,7 +35,7 @@ const (
 
 type LocalManager struct {
 	registry       Registry
-	previousSubnet ip.IP4Net
+	previousSubnet net.IPNet
 }
 
 type watchCursor struct {
@@ -69,7 +70,7 @@ func (c watchCursor) String() string {
 	return strconv.FormatUint(c.index, 10)
 }
 
-func NewLocalManager(config *EtcdConfig, prevSubnet ip.IP4Net) (Manager, error) {
+func NewLocalManager(config *EtcdConfig, prevSubnet net.IPNet) (Manager, error) {
 	r, err := newEtcdSubnetRegistry(config, nil)
 	if err != nil {
 		return nil, err
@@ -77,7 +78,7 @@ func NewLocalManager(config *EtcdConfig, prevSubnet ip.IP4Net) (Manager, error) 
 	return newLocalManager(r, prevSubnet), nil
 }
 
-func newLocalManager(r Registry, prevSubnet ip.IP4Net) Manager {
+func newLocalManager(r Registry, prevSubnet net.IPNet) Manager {
 	return &LocalManager{
 		registry:       r,
 		previousSubnet: prevSubnet,
@@ -282,7 +283,7 @@ func getNextIndex(cursor interface{}) (uint64, error) {
 	return nextIndex, nil
 }
 
-func (m *LocalManager) leaseWatchReset(ctx context.Context, sn ip.IP4Net) (LeaseWatchResult, error) {
+func (m *LocalManager) leaseWatchReset(ctx context.Context, sn net.IPNet) (LeaseWatchResult, error) {
 	l, index, err := m.registry.getSubnet(ctx, sn)
 	if err != nil {
 		return LeaseWatchResult{}, err
@@ -294,7 +295,7 @@ func (m *LocalManager) leaseWatchReset(ctx context.Context, sn ip.IP4Net) (Lease
 	}, nil
 }
 
-func (m *LocalManager) WatchLease(ctx context.Context, sn ip.IP4Net, cursor interface{}) (LeaseWatchResult, error) {
+func (m *LocalManager) WatchLease(ctx context.Context, sn net.IPNet, cursor interface{}) (LeaseWatchResult, error) {
 	if cursor == nil {
 		return m.leaseWatchReset(ctx, sn)
 	}
@@ -369,7 +370,7 @@ func (m *LocalManager) leasesWatchReset(ctx context.Context) (LeaseWatchResult, 
 	return wr, nil
 }
 
-func isSubnetConfigCompat(config *Config, sn ip.IP4Net) bool {
+func isSubnetConfigCompat(config *Config, sn net.IPNet) bool {
 	if sn.IP < config.SubnetMin || sn.IP > config.SubnetMax {
 		return false
 	}

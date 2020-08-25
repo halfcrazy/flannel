@@ -75,7 +75,7 @@ func (be *IPIPBackend) RegisterNetwork(ctx context.Context, wg *sync.WaitGroup, 
 	}
 
 	attrs := &subnet.LeaseAttrs{
-		PublicIP:    ip.FromIP(be.extIface.ExtAddr),
+		PublicIP:    be.extIface.ExtAddr,
 		BackendType: backendType,
 	}
 
@@ -99,14 +99,14 @@ func (be *IPIPBackend) RegisterNetwork(ctx context.Context, wg *sync.WaitGroup, 
 	n.LinkIndex = link.Index
 	n.GetRoute = func(lease *subnet.Lease) *netlink.Route {
 		route := netlink.Route{
-			Dst:       lease.Subnet.ToIPNet(),
-			Gw:        lease.Attrs.PublicIP.ToIP(),
+			Dst:       &lease.Subnet,
+			Gw:        lease.Attrs.PublicIP,
 			LinkIndex: n.LinkIndex,
 			Flags:     int(netlink.FLAG_ONLINK),
 		}
 
 		if cfg.DirectRouting {
-			dr, err := ip.DirectRouting(lease.Attrs.PublicIP.ToIP())
+			dr, err := ip.DirectRouting(lease.Attrs.PublicIP)
 
 			if err != nil {
 				log.Error(err)
@@ -196,7 +196,7 @@ func (be *IPIPBackend) configureIPIPDevice(lease *subnet.Lease) (*netlink.Iptun,
 	// Ensure that the device has a /32 address so that no broadcast routes are created.
 	// This IP is just used as a source address for host to workload traffic (so
 	// the return path for the traffic has an address on the flannel network to use as the destination)
-	if err := ip.EnsureV4AddressOnLink(ip.IP4Net{IP: lease.Subnet.IP, PrefixLen: 32}, link); err != nil {
+	if err := ip.EnsureAddressOnLink(lease.Subnet, link); err != nil {
 		return nil, fmt.Errorf("failed to ensure address of interface %s: %s", link.Attrs().Name, err)
 	}
 

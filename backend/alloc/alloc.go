@@ -17,7 +17,6 @@ package alloc
 import (
 	"fmt"
 	"github.com/coreos/flannel/backend"
-	"github.com/coreos/flannel/pkg/ip"
 	"github.com/coreos/flannel/subnet"
 	"golang.org/x/net/context"
 	"sync"
@@ -42,7 +41,7 @@ func New(sm subnet.Manager, extIface *backend.ExternalInterface) (backend.Backen
 
 func (be *AllocBackend) RegisterNetwork(ctx context.Context, wg *sync.WaitGroup, config *subnet.Config) (backend.Network, error) {
 	attrs := subnet.LeaseAttrs{
-		PublicIP: ip.FromIP(be.extIface.ExtAddr),
+		PublicIP: be.extIface.ExtAddr,
 	}
 
 	l, err := be.sm.AcquireLease(ctx, &attrs)

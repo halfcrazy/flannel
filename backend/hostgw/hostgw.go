@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"github.com/coreos/flannel/backend"
-	"github.com/coreos/flannel/pkg/ip"
 	"github.com/coreos/flannel/subnet"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/net/context"
@@ -62,14 +61,14 @@ func (be *HostgwBackend) RegisterNetwork(ctx context.Context, wg *sync.WaitGroup
 	}
 	n.GetRoute = func(lease *subnet.Lease) *netlink.Route {
 		return &netlink.Route{
-			Dst:       lease.Subnet.ToIPNet(),
-			Gw:        lease.Attrs.PublicIP.ToIP(),
+			Dst:       &lease.Subnet,
+			Gw:        lease.Attrs.PublicIP,
 			LinkIndex: n.LinkIndex,
 		}
 	}
 
 	attrs := subnet.LeaseAttrs{
-		PublicIP:    ip.FromIP(be.extIface.ExtAddr),
+		PublicIP:    be.extIface.ExtAddr,
 		BackendType: "host-gw",
 	}
 

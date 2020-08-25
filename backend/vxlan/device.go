@@ -113,8 +113,8 @@ func ensureLink(vxlan *netlink.Vxlan) (*netlink.Vxlan, error) {
 	return vxlan, nil
 }
 
-func (dev *vxlanDevice) Configure(ipn ip.IP4Net) error {
-	if err := ip.EnsureV4AddressOnLink(ipn, dev.link); err != nil {
+func (dev *vxlanDevice) Configure(ipn net.IPNet) error {
+	if err := ip.EnsureAddressOnLink(ipn, dev.link); err != nil {
 		return fmt.Errorf("failed to ensure address of interface %s: %s", dev.link.Attrs().Name, err)
 	}
 
@@ -131,7 +131,7 @@ func (dev *vxlanDevice) MACAddr() net.HardwareAddr {
 
 type neighbor struct {
 	MAC net.HardwareAddr
-	IP  ip.IP4
+	IP  net.IP
 }
 
 func (dev *vxlanDevice) AddFDB(n neighbor) error {
@@ -141,7 +141,7 @@ func (dev *vxlanDevice) AddFDB(n neighbor) error {
 		State:        netlink.NUD_PERMANENT,
 		Family:       syscall.AF_BRIDGE,
 		Flags:        netlink.NTF_SELF,
-		IP:           n.IP.ToIP(),
+		IP:           n.IP,
 		HardwareAddr: n.MAC,
 	})
 }
@@ -152,7 +152,7 @@ func (dev *vxlanDevice) DelFDB(n neighbor) error {
 		LinkIndex:    dev.link.Index,
 		Family:       syscall.AF_BRIDGE,
 		Flags:        netlink.NTF_SELF,
-		IP:           n.IP.ToIP(),
+		IP:           n.IP,
 		HardwareAddr: n.MAC,
 	})
 }
@@ -163,7 +163,7 @@ func (dev *vxlanDevice) AddARP(n neighbor) error {
 		LinkIndex:    dev.link.Index,
 		State:        netlink.NUD_PERMANENT,
 		Type:         syscall.RTN_UNICAST,
-		IP:           n.IP.ToIP(),
+		IP:           n.IP,
 		HardwareAddr: n.MAC,
 	})
 }
@@ -174,7 +174,7 @@ func (dev *vxlanDevice) DelARP(n neighbor) error {
 		LinkIndex:    dev.link.Index,
 		State:        netlink.NUD_PERMANENT,
 		Type:         syscall.RTN_UNICAST,
-		IP:           n.IP.ToIP(),
+		IP:           n.IP,
 		HardwareAddr: n.MAC,
 	})
 }

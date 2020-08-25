@@ -66,6 +66,25 @@ func GetInterfaceIP4Addr(iface *net.Interface) (net.IP, error) {
 	return nil, errors.New("No IPv4 address found for given interface")
 }
 
+func GetInterfaceIP6AddrMatch(iface *net.Interface, matchAddr net.IP) error {
+	addrs, err := getIfaceAddrs(iface)
+	if err != nil {
+		return err
+	}
+
+	for _, addr := range addrs {
+		// Attempt to parse the address in CIDR notation
+		// and assert it is IPv6
+		if ProtocolByIP(addr.IP) == ProtocolIPv6 {
+			if addr.IP.Equal(matchAddr) {
+				return nil
+			}
+		}
+	}
+
+	return errors.New("No IPv6 address found for given interface")
+}
+
 func GetInterfaceIP4AddrMatch(iface *net.Interface, matchAddr net.IP) error {
 	addrs, err := getIfaceAddrs(iface)
 	if err != nil {
@@ -110,7 +129,12 @@ func GetInterfaceByIP(ip net.IP) (*net.Interface, error) {
 	}
 
 	for _, iface := range ifaces {
-		err := GetInterfaceIP4AddrMatch(&iface, ip)
+		var err error
+		if ProtocolByIP(ip) == ProtocolIPv4 {
+			err = GetInterfaceIP4AddrMatch(&iface, ip)
+		} else {
+			err = GetInterfaceIP6AddrMatch(&iface, ip)
+		}
 		if err == nil {
 			return &iface, nil
 		}
@@ -144,6 +168,50 @@ func EnsureV4AddressOnLink(ipn IP4Net, link netlink.Link) error {
 	if len(existingAddrs) > 1 {
 		return fmt.Errorf("link has incompatible addresses. Remove additional addresses and try again. %#v", link)
 	}
+
+	// If the device has an incompatible address then delete it. This can happen if the lease changes for example.
+	if len(existingAddrs) == 1 && !existingAddrs[0].Equal(addr) {
+		if err := netlink.AddrDel(link, &existingAddrs[0]); err != nil {
+			return fmt.Errorf("failed to remove IP address %s from %s: %s", ipn.String(), link.Attrs().Name, err)
+		}
+		existingAddrs = []netlink.Addr{}
+	}
+
+	// Actually add the desired address to the interface if needed.
+	if len(existingAddrs) == 0 {
+		if err := netlink.AddrAdd(link, &addr); err != nil {
+			return fmt.Errorf("failed to add IP address %s to %s: %s", ipn.String(), link.Attrs().Name, err)
+		}
+	}
+
+	return nil
+}
+
+// EnsureAddressOnLink ensures that there is only one Addr on `link` and it equals `ipn`.
+// If there exist multiple addresses on link, it returns an error message to tell callers to remove additional address.
+func EnsureAddressOnLink(ipn net.IPNet, link netlink.Link) error {
+	var (
+		existingAddrs []netlink.Addr
+		err           error
+	)
+	if ProtocolByIPNet(ipn) == ProtocolIPv4 {
+		existingAddrs, err = netlink.AddrList(link, netlink.FAMILY_V4)
+		if err != nil {
+			return err
+		}
+	} else {
+		existingAddrs, err = netlink.AddrList(link, netlink.FAMILY_V6)
+		if err != nil {
+			return err
+		}
+	}
+
+	// flannel will never make this happen. This situation can only be caused by a user, so get them to sort it out.
+	if len(existingAddrs) > 1 {
+		return fmt.Errorf("link has incompatible addresses. Remove additional addresses and try again. %#v", link)
+	}
+
+	addr := netlink.Addr{IPNet: &ipn}
 
 	// If the device has an incompatible address then delete it. This can happen if the lease changes for example.
 	if len(existingAddrs) == 1 && !existingAddrs[0].Equal(addr) {

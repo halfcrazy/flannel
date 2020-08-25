@@ -18,6 +18,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+
 	"net"
 	"net/http"
 	"os"
@@ -47,15 +48,15 @@ import (
 
 	// Backends need to be imported for their init() to get executed and them to register
 	"github.com/coreos/flannel/backend"
-	_ "github.com/coreos/flannel/backend/alivpc"
+	//_ "github.com/coreos/flannel/backend/alivpc"
 	_ "github.com/coreos/flannel/backend/alloc"
-	_ "github.com/coreos/flannel/backend/awsvpc"
+	//_ "github.com/coreos/flannel/backend/awsvpc"
 	_ "github.com/coreos/flannel/backend/extension"
-	_ "github.com/coreos/flannel/backend/gce"
+	//_ "github.com/coreos/flannel/backend/gce"
 	_ "github.com/coreos/flannel/backend/hostgw"
-	_ "github.com/coreos/flannel/backend/ipip"
-	_ "github.com/coreos/flannel/backend/ipsec"
-	_ "github.com/coreos/flannel/backend/udp"
+	//_ "github.com/coreos/flannel/backend/ipip"
+	//_ "github.com/coreos/flannel/backend/ipsec"
+	//_ "github.com/coreos/flannel/backend/udp"
 	_ "github.com/coreos/flannel/backend/vxlan"
 	"github.com/coreos/go-systemd/daemon"
 )
@@ -127,7 +128,7 @@ func init() {
 	flannelFlags.StringVar(&opts.kubeAnnotationPrefix, "kube-annotation-prefix", "flannel.alpha.coreos.com", `Kubernetes annotation prefix. Can contain single slash "/", otherwise it will be appended at the end.`)
 	flannelFlags.StringVar(&opts.kubeConfigFile, "kubeconfig-file", "", "kubeconfig file location. Does not need to be specified if flannel is running in a pod.")
 	flannelFlags.BoolVar(&opts.version, "version", false, "print version and exit")
-	flannelFlags.StringVar(&opts.healthzIP, "healthz-ip", "0.0.0.0", "the IP address for healthz server to listen")
+	flannelFlags.StringVar(&opts.healthzIP, "healthz-ip", "", "the IP address for healthz server to listen")
 	flannelFlags.IntVar(&opts.healthzPort, "healthz-port", 0, "the port for healthz server to listen(0 to disable)")
 	flannelFlags.IntVar(&opts.iptablesResyncSeconds, "iptables-resync", 5, "resync period for iptables rules, in seconds")
 	flannelFlags.BoolVar(&opts.iptablesForwardRules, "iptables-forward-rules", true, "add default accept rules to FORWARD chain in iptables")
@@ -163,6 +164,7 @@ func newSubnetManager() (subnet.Manager, error) {
 	if opts.kubeSubnetMgr {
 		return kube.NewSubnetManager(opts.kubeApiUrl, opts.kubeConfigFile, opts.kubeAnnotationPrefix, opts.netConfPath)
 	}
+	return nil, errors.New("etcd datastore not yet impl for ipv6")
 
 	cfg := &etcdv2.EtcdConfig{
 		Endpoints: strings.Split(opts.etcdEndpoints, ","),
@@ -294,6 +296,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	var proto = ip.ProtocolByIP(extIface.ExtAddr)
+
 	// Set up ipMasq if needed
 	if opts.ipMasq {
 		if err = recycleIPTables(config.Network, bn.Lease()); err != nil {
@@ -303,7 +307,7 @@ func main() {
 			os.Exit(1)
 		}
 		log.Infof("Setting up masking rules")
-		go network.SetupAndEnsureIPTables(network.MasqRules(config.Network, bn.Lease()), opts.iptablesResyncSeconds)
+		go network.SetupAndEnsureIPTables(proto, network.MasqRules(config.Network, bn.Lease()), opts.iptablesResyncSeconds)
 	}
 
 	// Always enables forwarding rules. This is needed for Docker versions >1.13 (https://docs.docker.com/engine/userguide/networking/default_network/container-communication/#container-communication-between-hosts)
@@ -311,7 +315,7 @@ func main() {
 	// In Docker 1.13 and later, Docker sets the default policy of the FORWARD chain to DROP.
 	if opts.iptablesForwardRules {
 		log.Infof("Changing default FORWARD chain policy to ACCEPT")
-		go network.SetupAndEnsureIPTables(network.ForwardRules(config.Network.String()), opts.iptablesResyncSeconds)
+		go network.SetupAndEnsureIPTables(proto, network.ForwardRules(config.Network.String()), opts.iptablesResyncSeconds)
 	}
 
 	if err := WriteSubnetFile(opts.subnetFile, config.Network, opts.ipMasq, bn); err != nil {
@@ -347,16 +351,16 @@ func main() {
 	os.Exit(0)
 }
 
-func recycleIPTables(nw ip.IP4Net, lease *subnet.Lease) error {
+func recycleIPTables(nw net.IPNet, lease *subnet.Lease) error {
 	prevNetwork := ReadCIDRFromSubnetFile(opts.subnetFile, "FLANNEL_NETWORK")
 	prevSubnet := ReadCIDRFromSubnetFile(opts.subnetFile, "FLANNEL_SUBNET")
 	// recycle iptables rules only when network configured or subnet leased is not equal to current one.
-	if prevNetwork != nw && prevSubnet != lease.Subnet {
+	if prevNetwork.String() != nw.String() && prevSubnet.String() != lease.Subnet.String() {
 		log.Infof("Current network or subnet (%v, %v) is not equal to previous one (%v, %v), trying to recycle old iptables rules", nw, lease.Subnet, prevNetwork, prevSubnet)
 		lease := &subnet.Lease{
 			Subnet: prevSubnet,
 		}
-		if err := network.DeleteIPTables(network.MasqRules(prevNetwork, lease)); err != nil {
+		if err := network.DeleteIPTables(ip.ProtocolByIPNet(prevNetwork), network.MasqRules(prevNetwork, lease)); err != nil {
 			return err
 		}
 	}
@@ -449,6 +453,7 @@ func LookupExtIface(ifname string, ifregex string) (*backend.ExternalInterface, 
 	var ifaceAddr net.IP
 	var err error
 
+	// FIXME(yanzhu): ipv6
 	if len(ifname) > 0 {
 		if ifaceAddr = net.ParseIP(ifname); ifaceAddr != nil {
 			log.Infof("Searching for interface using %s", ifaceAddr)
@@ -556,7 +561,7 @@ func LookupExtIface(ifname string, ifregex string) (*backend.ExternalInterface, 
 	}, nil
 }
 
-func WriteSubnetFile(path string, nw ip.IP4Net, ipMasq bool, bn backend.Network) error {
+func WriteSubnetFile(path string, nw net.IPNet, ipMasq bool, bn backend.Network) error {
 	dir, name := filepath.Split(path)
 	os.MkdirAll(dir, 0755)
 
@@ -569,7 +574,7 @@ func WriteSubnetFile(path string, nw ip.IP4Net, ipMasq bool, bn backend.Network)
 	// Write out the first usable IP by incrementing
 	// sn.IP by one
 	sn := bn.Lease().Subnet
-	sn.IP += 1
+	sn.IP = ip.NextIP(sn.IP)
 
 	fmt.Fprintf(f, "FLANNEL_NETWORK=%s\n", nw)
 	fmt.Fprintf(f, "FLANNEL_SUBNET=%s\n", sn)
@@ -601,18 +606,18 @@ func mustRunHealthz() {
 	}
 }
 
-func ReadCIDRFromSubnetFile(path string, CIDRKey string) ip.IP4Net {
-	var prevCIDR ip.IP4Net
+func ReadCIDRFromSubnetFile(path string, CIDRKey string) net.IPNet {
+	var prevCIDR *net.IPNet
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		prevSubnetVals, err := godotenv.Read(path)
 		if err != nil {
 			log.Errorf("Couldn't fetch previous %s from subnet file at %s: %s", CIDRKey, path, err)
 		} else if prevCIDRString, ok := prevSubnetVals[CIDRKey]; ok {
-			err = prevCIDR.UnmarshalJSON([]byte(prevCIDRString))
+			_, prevCIDR, err = net.ParseCIDR(prevCIDRString)
 			if err != nil {
 				log.Errorf("Couldn't parse previous %s from subnet file at %s: %s", CIDRKey, path, err)
 			}
 		}
 	}
-	return prevCIDR
+	return *prevCIDR
 }

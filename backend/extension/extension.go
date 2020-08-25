@@ -26,7 +26,6 @@ import (
 	log "github.com/golang/glog"
 
 	"github.com/coreos/flannel/backend"
-	"github.com/coreos/flannel/pkg/ip"
 	"github.com/coreos/flannel/subnet"
 	"golang.org/x/net/context"
 )
@@ -96,7 +95,7 @@ func (be *ExtensionBackend) RegisterNetwork(ctx context.Context, wg *sync.WaitGr
 	}
 
 	attrs := subnet.LeaseAttrs{
-		PublicIP:    ip.FromIP(be.extIface.ExtAddr),
+		PublicIP:    be.extIface.ExtAddr,
 		BackendType: "extension",
 		BackendData: data,
 	}

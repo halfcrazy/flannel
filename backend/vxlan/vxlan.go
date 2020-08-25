@@ -95,7 +95,7 @@ func newSubnetAttrs(publicIP net.IP, mac net.HardwareAddr) (*subnet.LeaseAttrs, 
 	}
 
 	return &subnet.LeaseAttrs{
-		PublicIP:    ip.FromIP(publicIP),
+		PublicIP:    publicIP,
 		BackendType: "vxlan",
 		BackendData: json.RawMessage(data),
 	}, nil
@@ -153,7 +153,7 @@ func (be *VXLANBackend) RegisterNetwork(ctx context.Context, wg *sync.WaitGroup,
 	// Ensure that the device has a /32 address so that no broadcast routes are created.
 	// This IP is just used as a source address for host to workload traffic (so
 	// the return path for the traffic has an address on the flannel network to use as the destination)
-	if err := dev.Configure(ip.IP4Net{IP: lease.Subnet.IP, PrefixLen: 32}); err != nil {
+	if err := dev.Configure(lease.Subnet); err != nil {
 		return nil, fmt.Errorf("failed to configure interface %s: %s", dev.link.Attrs().Name, err)
 	}
 

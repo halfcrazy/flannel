@@ -17,13 +17,14 @@ package network
 
 import (
 	"fmt"
+	"github.com/coreos/flannel/pkg/ip"
+	"net"
 	"strings"
 
 	log "github.com/golang/glog"
 
 	"time"
 
-	"github.com/coreos/flannel/pkg/ip"
 	"github.com/coreos/flannel/subnet"
 	"github.com/coreos/go-iptables/iptables"
 )
@@ -40,11 +41,11 @@ type IPTablesRule struct {
 	rulespec []string
 }
 
-func MasqRules(ipn ip.IP4Net, lease *subnet.Lease) []IPTablesRule {
+func MasqRules(ipn net.IPNet, lease *subnet.Lease) []IPTablesRule {
 	n := ipn.String()
 	sn := lease.Subnet.String()
 	supports_random_fully := false
-	ipt, err := iptables.New()
+	ipt, err := iptables.NewWithProtocol(iptables.Protocol(ip.ProtocolByIPNet(ipn)))
 	if err == nil {
 		supports_random_fully = ipt.HasRandomFully()
 	}
@@ -97,8 +98,8 @@ func ipTablesRulesExist(ipt IPTables, rules []IPTablesRule) (bool, error) {
 	return true, nil
 }
 
-func SetupAndEnsureIPTables(rules []IPTablesRule, resyncPeriod int) {
-	ipt, err := iptables.New()
+func SetupAndEnsureIPTables(protocol ip.Protocol, rules []IPTablesRule, resyncPeriod int) {
+	ipt, err := iptables.NewWithProtocol(iptables.Protocol(protocol))
 	if err != nil {
 		// if we can't find iptables, give up and return
 		log.Errorf("Failed to setup IPTables. iptables binary was not found: %v", err)
@@ -120,8 +121,8 @@ func SetupAndEnsureIPTables(rules []IPTablesRule, resyncPeriod int) {
 }
 
 // DeleteIPTables delete specified iptables rules
-func DeleteIPTables(rules []IPTablesRule) error {
-	ipt, err := iptables.New()
+func DeleteIPTables(protocol ip.Protocol, rules []IPTablesRule) error {
+	ipt, err := iptables.NewWithProtocol(iptables.Protocol(protocol))
 	if err != nil {
 		// if we can't find iptables, give up and return
 		log.Errorf("Failed to setup IPTables. iptables binary was not found: %v", err)

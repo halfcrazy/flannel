@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"path"
 	"regexp"
 	"sync"
@@ -28,7 +29,6 @@ import (
 	log "github.com/golang/glog"
 	"golang.org/x/net/context"
 
-	"github.com/coreos/flannel/pkg/ip"
 	. "github.com/coreos/flannel/subnet"
 )
 
@@ -39,12 +39,12 @@ var (
 type Registry interface {
 	getNetworkConfig(ctx context.Context) (string, error)
 	getSubnets(ctx context.Context) ([]Lease, uint64, error)
-	getSubnet(ctx context.Context, sn ip.IP4Net) (*Lease, uint64, error)
-	createSubnet(ctx context.Context, sn ip.IP4Net, attrs *LeaseAttrs, ttl time.Duration) (time.Time, error)
-	updateSubnet(ctx context.Context, sn ip.IP4Net, attrs *LeaseAttrs, ttl time.Duration, asof uint64) (time.Time, error)
-	deleteSubnet(ctx context.Context, sn ip.IP4Net) error
+	getSubnet(ctx context.Context, sn net.IPNet) (*Lease, uint64, error)
+	createSubnet(ctx context.Context, sn net.IPNet, attrs *LeaseAttrs, ttl time.Duration) (time.Time, error)
+	updateSubnet(ctx context.Context, sn net.IPNet, attrs *LeaseAttrs, ttl time.Duration, asof uint64) (time.Time, error)
+	deleteSubnet(ctx context.Context, sn net.IPNet) error
 	watchSubnets(ctx context.Context, since uint64) (Event, uint64, error)
-	watchSubnet(ctx context.Context, since uint64, sn ip.IP4Net) (Event, uint64, error)
+	watchSubnet(ctx context.Context, since uint64, sn net.IPNet) (Event, uint64, error)
 }
 
 type EtcdConfig struct {
@@ -149,7 +149,7 @@ func (esr *etcdSubnetRegistry) getSubnets(ctx context.Context) ([]Lease, uint64,
 	return leases, resp.Index, nil
 }
 
-func (esr *etcdSubnetRegistry) getSubnet(ctx context.Context, sn ip.IP4Net) (*Lease, uint64, error) {
+func (esr *etcdSubnetRegistry) getSubnet(ctx context.Context, sn net.IPNet) (*Lease, uint64, error) {
 	key := path.Join(esr.etcdCfg.Prefix, "subnets", MakeSubnetKey(sn))
 	resp, err := esr.client().Get(ctx, key, &etcd.GetOptions{Quorum: true})
 	if err != nil {
@@ -160,7 +160,7 @@ func (esr *etcdSubnetRegistry) getSubnet(ctx context.Context, sn ip.IP4Net) (*Le
 	return l, resp.Index, err
 }
 
-func (esr *etcdSubnetRegistry) createSubnet(ctx context.Context, sn ip.IP4Net, attrs *LeaseAttrs, ttl time.Duration) (time.Time, error) {
+func (esr *etcdSubnetRegistry) createSubnet(ctx context.Context, sn net.IPNet, attrs *LeaseAttrs, ttl time.Duration) (time.Time, error) {
 	key := path.Join(esr.etcdCfg.Prefix, "subnets", MakeSubnetKey(sn))
 	value, err := json.Marshal(attrs)
 	if err != nil {
@@ -185,7 +185,7 @@ func (esr *etcdSubnetRegistry) createSubnet(ctx context.Context, sn ip.IP4Net, a
 	return exp, nil
 }
 
-func (esr *etcdSubnetRegistry) updateSubnet(ctx context.Context, sn ip.IP4Net, attrs *LeaseAttrs, ttl time.Duration, asof uint64) (time.Time, error) {
+func (esr *etcdSubnetRegistry) updateSubnet(ctx context.Context, sn net.IPNet, attrs *LeaseAttrs, ttl time.Duration, asof uint64) (time.Time, error) {
 	key := path.Join(esr.etcdCfg.Prefix, "subnets", MakeSubnetKey(sn))
 	value, err := json.Marshal(attrs)
 	if err != nil {
@@ -208,7 +208,7 @@ func (esr *etcdSubnetRegistry) updateSubnet(ctx context.Context, sn ip.IP4Net, a
 	return exp, nil
 }
 
-func (esr *etcdSubnetRegistry) deleteSubnet(ctx context.Context, sn ip.IP4Net) error {
+func (esr *etcdSubnetRegistry) deleteSubnet(ctx context.Context, sn net.IPNet) error {
 	key := path.Join(esr.etcdCfg.Prefix, "subnets", MakeSubnetKey(sn))
 	_, err := esr.client().Delete(ctx, key, nil)
 	return err
@@ -229,7 +229,7 @@ func (esr *etcdSubnetRegistry) watchSubnets(ctx context.Context, since uint64) (
 	return evt, e.Node.ModifiedIndex, err
 }
 
-func (esr *etcdSubnetRegistry) watchSubnet(ctx context.Context, since uint64, sn ip.IP4Net) (Event, uint64, error) {
+func (esr *etcdSubnetRegistry) watchSubnet(ctx context.Context, since uint64, sn net.IPNet) (Event, uint64, error) {
 	key := path.Join(esr.etcdCfg.Prefix, "subnets", MakeSubnetKey(sn))
 	opts := &etcd.WatcherOptions{
 		AfterIndex: since,

@@ -23,7 +23,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/coreos/flannel/pkg/ip"
 	"github.com/coreos/flannel/subnet"
 
 	"github.com/golang/glog"
@@ -285,7 +284,7 @@ func (ksm *kubeSubnetManager) AcquireLease(ctx context.Context, attrs *subnet.Le
 		glog.Errorf("Unable to set NetworkUnavailable to False for %q: %v", ksm.nodeName, err)
 	}
 	return &subnet.Lease{
-		Subnet:     ip.FromIPNet(cidr),
+		Subnet:     *cidr,
 		Attrs:      *attrs,
 		Expiration: time.Now().Add(24 * time.Hour),
 	}, nil
@@ -308,9 +307,9 @@ func (ksm *kubeSubnetManager) Run(ctx context.Context) {
 }
 
 func (ksm *kubeSubnetManager) nodeToLease(n v1.Node) (l subnet.Lease, err error) {
-	l.Attrs.PublicIP, err = ip.ParseIP4(n.Annotations[ksm.annotations.BackendPublicIP])
-	if err != nil {
-		return l, err
+	l.Attrs.PublicIP = net.ParseIP(n.Annotations[ksm.annotations.BackendPublicIP])
+	if l.Attrs.PublicIP == nil {
+		return l, fmt.Errorf("invalid IP: %s", n.Annotations[ksm.annotations.BackendPublicIP])
 	}
 
 	l.Attrs.BackendType = n.Annotations[ksm.annotations.BackendType]
@@ -321,7 +320,7 @@ func (ksm *kubeSubnetManager) nodeToLease(n v1.Node) (l subnet.Lease, err error)
 		return l, err
 	}
 
-	l.Subnet = ip.FromIPNet(cidr)
+	l.Subnet = *cidr
 	return l, nil
 }
 
@@ -330,7 +329,7 @@ func (ksm *kubeSubnetManager) RenewLease(ctx context.Context, lease *subnet.Leas
 	return ErrUnimplemented
 }
 
-func (ksm *kubeSubnetManager) WatchLease(ctx context.Context, sn ip.IP4Net, cursor interface{}) (subnet.LeaseWatchResult, error) {
+func (ksm *kubeSubnetManager) WatchLease(ctx context.Context, sn net.IPNet, cursor interface{}) (subnet.LeaseWatchResult, error) {
 	return subnet.LeaseWatchResult{}, ErrUnimplemented
 }
 
