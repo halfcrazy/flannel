@@ -63,24 +63,14 @@ github.com/bronze1man/goStrongswanVici
 # github.com/containernetworking/plugins v0.8.6
 ## explicit
 github.com/containernetworking/plugins/pkg/utils/sysctl
-# github.com/coreos/etcd v3.1.11+incompatible
-## explicit
-github.com/coreos/etcd/client
-github.com/coreos/etcd/pkg/fileutil
-github.com/coreos/etcd/pkg/pathutil
-github.com/coreos/etcd/pkg/tlsutil
-github.com/coreos/etcd/pkg/transport
-github.com/coreos/etcd/pkg/types
 # github.com/coreos/go-iptables v0.4.5
 ## explicit
 github.com/coreos/go-iptables/iptables
 # github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 ## explicit
 github.com/coreos/go-systemd/daemon
-github.com/coreos/go-systemd/journal
 # github.com/coreos/pkg v0.0.0-20160727233714-3ac0863d7acf
 ## explicit
-github.com/coreos/pkg/capnslog
 github.com/coreos/pkg/flagutil
 # github.com/davecgh/go-spew v1.1.0
 github.com/davecgh/go-spew/spew
@@ -141,9 +131,6 @@ github.com/jmespath/go-jmespath
 # github.com/joho/godotenv v0.0.0-20161216230537-726cc8b906e3
 ## explicit
 github.com/joho/godotenv
-# github.com/jonboulle/clockwork v0.1.0
-## explicit
-github.com/jonboulle/clockwork
 # github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68
 ## explicit
 github.com/juju/errors

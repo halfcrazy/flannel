@@ -36,7 +36,6 @@ import (
 	"github.com/coreos/flannel/network"
 	"github.com/coreos/flannel/pkg/ip"
 	"github.com/coreos/flannel/subnet"
-	"github.com/coreos/flannel/subnet/etcdv2"
 	"github.com/coreos/flannel/subnet/kube"
 	"github.com/coreos/flannel/version"
 
@@ -165,21 +164,6 @@ func newSubnetManager() (subnet.Manager, error) {
 		return kube.NewSubnetManager(opts.kubeApiUrl, opts.kubeConfigFile, opts.kubeAnnotationPrefix, opts.netConfPath)
 	}
 	return nil, errors.New("etcd datastore not yet impl for ipv6")
-
-	cfg := &etcdv2.EtcdConfig{
-		Endpoints: strings.Split(opts.etcdEndpoints, ","),
-		Keyfile:   opts.etcdKeyfile,
-		Certfile:  opts.etcdCertfile,
-		CAFile:    opts.etcdCAFile,
-		Prefix:    opts.etcdPrefix,
-		Username:  opts.etcdUsername,
-		Password:  opts.etcdPassword,
-	}
-
-	// Attempt to renew the lease for the subnet specified in the subnetFile
-	prevSubnet := ReadCIDRFromSubnetFile(opts.subnetFile, "FLANNEL_SUBNET")
-
-	return etcdv2.NewLocalManager(cfg, prevSubnet)
 }
 
 func main() {

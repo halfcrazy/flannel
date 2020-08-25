@@ -10,7 +10,6 @@ require (
 	github.com/aws/aws-sdk-go v1.12.54
 	github.com/bronze1man/goStrongswanVici v0.0.0-20171013065002-4d72634a2f11
 	github.com/containernetworking/plugins v0.8.6
-	github.com/coreos/etcd v3.1.11+incompatible
 	github.com/coreos/go-iptables v0.4.5
 	github.com/coreos/go-systemd v0.0.0-20180511133405-39ca1b05acc7
 	github.com/coreos/pkg v0.0.0-20160727233714-3ac0863d7acf
@@ -30,7 +29,6 @@ require (
 	github.com/imdario/mergo v0.0.0-20141206190957-6633656539c1 // indirect
 	github.com/jmespath/go-jmespath v0.0.0-20160803190731-bd40a432e4c7 // indirect
 	github.com/joho/godotenv v0.0.0-20161216230537-726cc8b906e3
-	github.com/jonboulle/clockwork v0.1.0
 	github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68
 	github.com/juju/ratelimit v0.0.0-20151125201925-77ed1c8a0121 // indirect
 	github.com/juju/testing v0.0.0-20200706033705-4c23f9c453cd // indirect
