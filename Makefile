@@ -9,7 +9,7 @@ TAG?=$(shell git describe --tags --dirty)
 ARCH?=amd64
 # Only enable CGO (and build the UDP backend) on AMD64
 ifeq ($(ARCH),amd64)
-	CGO_ENABLED=1
+	CGO_ENABLED=0
 else
 	CGO_ENABLED=0
 endif
@@ -140,7 +140,7 @@ endif
 		-v $(CURDIR)/dist:/go/src/github.com/coreos/flannel/dist \
 		golang:$(GO_VERSION) /bin/bash -c '\
 		cd /go/src/github.com/coreos/flannel && \
-		CGO_ENABLED=1 make -e dist/flanneld && \
+		CGO_ENABLED=0 make -e dist/flanneld && \
 		mv dist/flanneld dist/flanneld-$(ARCH)'
 	docker build -f Dockerfile.$(ARCH) -t $(REGISTRY):$(TAG)-$(ARCH) .
 
