@@ -105,7 +105,8 @@ func ParseConfig(s string) (*Config, error) {
 		}
 
 		if cfg.SubnetMax == nil {
-			cfg.SubnetMax = ip.PreviousNIP(cfg.Network.IP, subnetSize)
+			// FIXME: cfg.SubnetMax = cfg.Network.Next().IP - subnetSize
+			cfg.SubnetMax = ip.CIDRLastIP(cfg.Network)
 		} else if !cfg.Network.Contains(cfg.SubnetMax) {
 			return nil, errors.New("SubnetMax is not in the range of the Network")
 		}
@@ -160,7 +161,7 @@ func ParseConfig(s string) (*Config, error) {
 		}
 
 		if cfg.SubnetMax == nil {
-			cfg.SubnetMax = ip.PreviousNIP(cfg.Network.IP, subnetSize)
+			cfg.SubnetMax = ip.CIDRLastIP(cfg.Network)
 		} else if !cfg.Network.Contains(cfg.SubnetMax) {
 			return nil, errors.New("SubnetMax is not in the range of the Network")
 		}

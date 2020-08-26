@@ -593,7 +593,7 @@ func mustRunHealthz() {
 }
 
 func ReadCIDRFromSubnetFile(path string, CIDRKey string) net.IPNet {
-	var prevCIDR *net.IPNet
+	var prevCIDR = new(net.IPNet)
 	if _, err := os.Stat(path); !os.IsNotExist(err) {
 		prevSubnetVals, err := godotenv.Read(path)
 		if err != nil {
